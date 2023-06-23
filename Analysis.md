@@ -281,6 +281,149 @@ ORDER BY
 
 ```
 
+## Query 11 - Top Product Line by Total Gross Income and Number of Purchases
+```sql
+-- Calculate the total gross income and number of purchases for each customer type and product line,
+-- and rank them based on the total gross income within each customer type
+SELECT 
+    sub.Customer_type, 
+    sub.Product_line, 
+    sub.total_gross_income, 
+    sub.no_of_purchases, 
+    sub.rank
+FROM (
+    SELECT
+        s.Customer_type,
+        s.Product_line,
+        SUM(s.gross_income) AS total_gross_income,
+        COUNT(*) AS no_of_purchases,
+        RANK() OVER (PARTITION BY s.Customer_type ORDER BY SUM(s.gross_income) DESC) AS rank
+    FROM
+        Sales s
+    JOIN
+        branch b ON s.Branch_Code = b.Branch_Code
+    WHERE
+        s.Customer_type <> 'Unknown'
+    GROUP BY
+        s.Customer_type,
+        s.Product_line
+) AS sub
+WHERE
+    sub.rank <= 3
+ORDER BY
+    sub.Customer_type,
+    sub.total_gross_income DESC
+LIMIT 6;
+
+```
+
+## Query 12 - Income Grade by Branch and Customer Type
+```sql
+-- Calculate the total gross income for each branch and customer type,
+-- and categorize the income as 'high income' or 'low income' based on a threshold of 500
+SELECT
+    b.branch_name,
+    s.customer_type,
+    SUM(s.gross_income) AS gross_income,
+    CASE
+        WHEN SUM(s.gross_income) >= 500 THEN 'high income'
+        ELSE 'low income'
+    END AS income_grade
+FROM
+    Sales s
+JOIN
+    branch b ON s.branch_code = b.branch_code
+WHERE
+    s.customer_type IN ('Member', 'Normal')
+GROUP BY
+    b.branch_name,
+    s.customer_type
+ORDER BY
+    b.branch_name,
+    s.customer_type;
+
+```
+
+## Query 13 - Quantity Sold and Difference from Previous and Next Days
+```sql
+-- Retrieve the total quantity sold for each product line on a specific date range,
+-- and calculate the difference in quantity from the previous and next days for each product line
+SELECT
+    s.Date AS date,
+    s.Product_line AS product_line,
+    SUM(s.Quantity) AS total_quantity_sold,
+    COALESCE(prev_day.Quantity, 0) AS prev_day_qty,
+    COALESCE(next_day.Quantity, 0) AS next_day_qty,
+    COALESCE(prev_day.Quantity, 0) - COALESCE(next_day.Quantity, 0) AS diff_prev_day_qty,
+    COALESCE(next_day.Quantity, 0) - COALESCE(prev_day.Quantity, 0) AS diff_next_day_qty
+FROM
+    sales AS s
+LEFT JOIN
+    sales AS prev_day ON prev_day.Date = DATE(s.Date, '-1 day')
+    AND prev_day.Product_line = s.Product_line
+LEFT JOIN
+    sales AS next_day ON next_day.Date = DATE(s.Date, '+1 day')
+    AND next_day.Product_line = s.Product_line
+WHERE
+    s.Date BETWEEN '2019-03-01' AND '2019-03-07'
+    AND s.Product_line IN ('Health and beauty', 'Home and lifestyle', 'Food and beverages')
+GROUP BY
+    s.Date,
+    s.Product_line
+ORDER BY
+    s.Date, s.Product_line;
+
+```
+
+## Query 14 - Average Rating by City
+```sql
+-- Calculate the average rating for each city and rank them based on the average rating in descending order
+SELECT
+    RANK() OVER (ORDER BY avg_rating DESC) AS rank,
+    c.City_Name AS city_name,
+    subquery.Customer_type,
+    subquery.avg_rating
+
+FROM (
+    SELECT
+        s.City_Code,
+        s.Customer_type,
+        AVG(s.Rating) AS avg_rating
+    FROM
+        Sales s
+    WHERE
+        s.Customer_type <> 'unknown'
+    GROUP BY
+        s.City_Code,
+        s.Customer_type
+) AS subquery
+JOIN
+    City c ON subquery.City_Code = c.City_Code
+ORDER BY
+    subquery.avg_rating DESC;
+
+
+```
+
+## Query 15 - Total Quantity Sold and Gross Income by Product Line and City
+```sql
+-- Calculate the total quantity sold and gross income for each product line in each city,
+-- and order the results by gross income in descending order
+SELECT 
+    s.Product_line, c.City_Name, SUM(s.Quantity) AS Total_Qty_Sold, SUM(s.gross_income) AS Gross_Income
+FROM 
+    sales AS s
+JOIN 
+    city AS c ON s.City_Code = c.City_Code
+WHERE 
+    strftime('%w', date(s.Date)) = '0' OR strftime('%w', date(s.Date)) = '6'
+GROUP BY 
+    s.Product_line, c.City_Name
+ORDER BY 
+    Gross_Income DESC;
+```
+
+
 
 
 
